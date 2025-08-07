@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebAuthn Passkey Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@latest/dist/bundle/index.umd.min.js"></script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          Helvetica, Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f0f2f5;
+        color: #333;
+      }
+      .container {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-width: 400px;
+        width: 100%;
+      }
+      h1 {
+        color: #1a202c;
+        margin-bottom: 1rem;
+      }
+      input {
+        width: 100%;
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-sizing: border-box;
+      }
+      button {
+        width: 100%;
+        padding: 0.75rem;
+        border: none;
+        border-radius: 8px;
+        background-color: #4a5568;
+        color: white;
+        font-size: 1rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        margin-bottom: 8px;
+      }
+      button:hover {
+        background-color: #2d3748;
+      }
+      #message {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        border-radius: 8px;
+        display: none;
+      }
+      .success {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        border: 1px solid #badbcc;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #842029;
+        border: 1px solid #f5c2c7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Passkey Demo</h1>
+      <input type="text" id="username" placeholder="Enter username" />
+      <button onclick="register()">Register Passkey</button>
+      <button onclick="login()">Login with Passkey</button>
+      <div id="message"></div>
+    </div>
+    <script>
+      const usernameInput = document.getElementById('username');
+      const messageBox = document.getElementById('message');
+
+      function showMessage(text, type) {
+        messageBox.innerText = text;
+        messageBox.className = type;
+        messageBox.style.display = 'block';
+      }
+
+      async function register() {
+        const username = usernameInput.value;
+        if (!username) {
+          showMessage('Please enter a username.', 'error');
+          return;
+        }
+
+        try {
+          // 1. Get registration options from the server
+          const res = await fetch('/register-start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username }),
+          });
+          const options = await res.json();
+
+          // 2. Pass options to the browser to create the credential
+          const attestationResponse =
+            await SimpleWebAuthnBrowser.startRegistration(options);
+
+          // 3. Send the credential back to the server for verification
+          const verificationRes = await fetch('/register-finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, attestationResponse }),
+          });
+          const verificationResult = await verificationRes.json();
+
+          if (verificationResult.verified) {
+            showMessage('Passkey registered successfully!', 'success');
+          } else {
+            throw new Error('Registration verification failed.');
+          }
+        } catch (error) {
+          console.error(error);
+          showMessage(error.message || 'Registration failed.', 'error');
+        }
+      }
+
+      async function login() {
+        const username = usernameInput.value;
+        if (!username) {
+          showMessage('Please enter a username.', 'error');
+          return;
+        }
+        try {
+          // 1. Get authentication options from the server
+          const res = await fetch('/login-start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username }),
+          });
+          const options = await res.json();
+
+          // 2. Pass options to the browser to get an assertion
+          const assertionResponse =
+            await SimpleWebAuthnBrowser.startAuthentication(options);
+
+          // 3. Send the assertion back to the server for verification
+          const verificationRes = await fetch('/login-finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, assertionResponse }),
+          });
+          const verificationResult = await verificationRes.json();
+
+          if (verificationResult.verified) {
+            showMessage('Login successful!', 'success');
+          } else {
+            throw new Error('Authentication verification failed.');
+          }
+        } catch (error) {
+          console.error(error);
+          showMessage(error.message || 'Login failed.', 'error');
+        }
+      }
+    </script>
+  </body>
+</html>
