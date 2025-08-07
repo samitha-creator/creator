@@ -100,9 +100,7 @@ app.post('/register-finish', async (req, res) => {
       const { credential } = registrationInfo;
       const newCredential = {
         credentialID: credential.id,
-        credentialPublicKey: Buffer.from(credential.publicKey).toString(
-          'base64',
-        ),
+        credentialPublicKey: credential.publicKey,
         counter: credential.counter,
       };
 
@@ -128,7 +126,6 @@ app.post('/register-finish', async (req, res) => {
 app.post('/login-start', async (req, res) => {
   const { username } = req.body;
   const user = users.get(username);
-  console.log(users);
   if (!user || user.credentials.length === 0) {
     return res
       .status(404)
@@ -163,17 +160,18 @@ app.post('/login-finish', async (req, res) => {
       return res.status(400).send('Credential not found.');
     }
 
-    const verification = await verifyAuthenticationResponse({
+    const options = {
       response: assertionResponse,
       expectedChallenge: req.session.currentChallenge,
       expectedOrigin: origin,
       expectedRPID: relyingPartyId,
       credential: {
         id: credential.credentialID,
-        publicKey: credential.credentialPublicKey,
+        publicKey: new Uint8Array(credential.credentialPublicKey),
         counter: credential.counter,
       },
-    });
+    };
+    const verification = await verifyAuthenticationResponse(options);
 
     const { verified, authenticationInfo } = verification;
 
